@@ -1,9 +1,11 @@
 .PHONY: build deploy run
 
 flower-binary = target/arm-unknown-linux-musleabi/debug/flower
+registry-cache = "$(PWD)/target/.registry"
 
 $(flower-binary): $(wildcard src/* Cargo.*)
-	docker run --rm -it -v "$(PWD)":/home/rust/src messense/rust-musl-cross:arm-musleabi cargo build
+	mkdir -p "$(registry-cache)"
+	docker run --rm -it -v "$(registry-cache)":/root/.cargo/registry -v "$(PWD)":/home/rust/src messense/rust-musl-cross:arm-musleabi cargo build
 
 build: $(flower-binary)
 
