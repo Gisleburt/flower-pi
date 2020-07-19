@@ -1,4 +1,20 @@
+use serde::export::Formatter;
 use serde::Deserialize;
+use std::fmt;
+
+pub enum LocationId {
+    All,
+    Location(u32),
+}
+
+impl fmt::Display for LocationId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::All => write!(f, "all"),
+            LocationId::Location(loc) => write!(f, "{}", loc),
+        }
+    }
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
