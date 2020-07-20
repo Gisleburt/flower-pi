@@ -2,12 +2,12 @@ use core::fmt;
 use isahc::config::RedirectPolicy;
 use isahc::prelude::*;
 use isahc::ResponseExt;
+use rppal::gpio::{Gpio, OutputPin};
 use scraper::{Html, Selector};
 use std::convert::{TryFrom, TryInto};
 use std::error::Error as StdError;
 use std::thread;
 use std::time::Duration;
-use rppal::gpio::Gpio;
 
 type Result<T> = std::result::Result<T, Box<dyn StdError>>;
 
@@ -99,16 +99,47 @@ fn get_pollen_count() -> Result<PollenCount> {
     Ok(pollen_indicator.try_into()?)
 }
 
-const GPIO_LED: u8 = 17;
+const GPIO17: u8 = 17;
+
+struct LedBar {
+    pins: Vec<OutputPin>,
+}
+
+impl LedBar {
+    fn new(pin_numbers: &[u8]) -> LedBar {
+        LedBar {
+            pins: pin_numbers
+                .iter()
+                .map(|pin| Gpio::new().unwrap().get(*pin).unwrap().into_output())
+                .collect(),
+        }
+    }
+
+    fn test(&mut self) {
+        self.pins.iter_mut().for_each(|pin| {
+            pin.set_high();
+            thread::sleep(Duration::from_millis(100));
+            pin.set_low();
+        });
+        self.pins.iter_mut().rev().for_each(|pin| {
+            pin.set_high();
+            thread::sleep(Duration::from_millis(100));
+            pin.set_low();
+        });
+    }
+
+    fn clear(&mut self) {
+        self.pins.iter_mut().for_each(|pin| {
+            pin.set_low();
+        });
+    }
+}
 
 fn main() {
     // println!("{}", get_pollen_count().unwrap());
-    let mut pin = Gpio::new().unwrap().get(GPIO_LED).unwrap().into_output();
-
+    let mut bar = LedBar::new(&[17, 18, 27, 22, 23, 24, 25, 12, 13, 19]);
+    bar.clear();
     loop {
-        pin.set_high();
-        thread::sleep(Duration::from_millis(500));
-        pin.set_low();
-        thread::sleep(Duration::from_millis(500));
+        bar.test();
     }
 }
