@@ -5,6 +5,9 @@ use isahc::ResponseExt;
 use scraper::{Html, Selector};
 use std::convert::{TryFrom, TryInto};
 use std::error::Error as StdError;
+use std::thread;
+use std::time::Duration;
+use rppal::gpio::Gpio;
 
 type Result<T> = std::result::Result<T, Box<dyn StdError>>;
 
@@ -96,6 +99,16 @@ fn get_pollen_count() -> Result<PollenCount> {
     Ok(pollen_indicator.try_into()?)
 }
 
+const GPIO_LED: u8 = 17;
+
 fn main() {
-    println!("{}", get_pollen_count().unwrap())
+    // println!("{}", get_pollen_count().unwrap());
+    let mut pin = Gpio::new().unwrap().get(GPIO_LED).unwrap().into_output();
+
+    loop {
+        pin.set_high();
+        thread::sleep(Duration::from_millis(500));
+        pin.set_low();
+        thread::sleep(Duration::from_millis(500));
+    }
 }

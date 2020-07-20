@@ -9,4 +9,5 @@ license = "MIT"
 
 [dependencies]
 isahc = "0.9.5"
+rppal = "0.11.3"
 scraper = "0.12.0"
