@@ -2,12 +2,15 @@ use core::fmt;
 use isahc::config::RedirectPolicy;
 use isahc::prelude::*;
 use isahc::ResponseExt;
-use rppal::gpio::{Gpio, OutputPin};
 use scraper::{Html, Selector};
-use std::convert::{TryFrom, TryInto};
-use std::error::Error as StdError;
-use std::thread;
-use std::time::Duration;
+use spidev::{SpiModeFlags, Spidev, SpidevOptions};
+use std::{
+    convert::{TryFrom, TryInto},
+    error::Error as StdError,
+    io::Write,
+    thread,
+    time::Duration,
+};
 
 type Result<T> = std::result::Result<T, Box<dyn StdError>>;
 
@@ -99,47 +102,75 @@ fn get_pollen_count() -> Result<PollenCount> {
     Ok(pollen_indicator.try_into()?)
 }
 
-const GPIO17: u8 = 17;
-
-struct LedBar {
-    pins: Vec<OutputPin>,
+struct LedValue {
+    brightness: u8,
+    blue: u8,
+    green: u8,
+    red: u8,
 }
 
-impl LedBar {
-    fn new(pin_numbers: &[u8]) -> LedBar {
-        LedBar {
-            pins: pin_numbers
-                .iter()
-                .map(|pin| Gpio::new().unwrap().get(*pin).unwrap().into_output())
-                .collect(),
+type LedMessage =  [u8;4];
+
+impl LedValue {
+    pub fn new(brightness: u8, red: u8, green: u8, blue: u8) -> Result<LedValue> {
+        if brightness > 31 {
+            Err(DumbError("brightness can not be higher than 31".to_string()).into())
+        } else {
+            Ok(LedValue { brightness, red, green, blue })
         }
     }
 
-    fn test(&mut self) {
-        self.pins.iter_mut().for_each(|pin| {
-            pin.set_high();
-            thread::sleep(Duration::from_millis(100));
-            pin.set_low();
-        });
-        self.pins.iter_mut().rev().for_each(|pin| {
-            pin.set_high();
-            thread::sleep(Duration::from_millis(100));
-            pin.set_low();
-        });
+    pub fn as_array(&self) -> LedMessage {
+        [self.brightness + 224, self.blue, self.green, self.red]
+    }
+}
+
+struct LedArray {
+    size: u8,
+    spi: Spidev,
+}
+
+impl LedArray {
+    fn new(size: u8) -> Result<LedArray> {
+        let mut spi = Spidev::open("/dev/spidev0.0")?;
+        let options = SpidevOptions::new()
+            .bits_per_word(8)
+            .max_speed_hz(30_000_000)
+            .mode(SpiModeFlags::SPI_MODE_1)
+            .build();
+        spi.configure(&options)?;
+        let mut led_array = LedArray { size, spi };
+        led_array.flush()?;
+        Ok(led_array)
     }
 
-    fn clear(&mut self) {
-        self.pins.iter_mut().for_each(|pin| {
-            pin.set_low();
-        });
+    fn render(&mut self, led_values: &Vec<LedValue>) -> Result<()> {
+        for led_value in led_values {
+            let values = led_value.as_array();
+            self.spi.write(&values)?;
+        }
+        self.flush()?;
+        thread::sleep(Duration::from_millis(10_000));
+        Ok(())
+    }
+
+    fn flush(&mut self) -> Result<()> {
+        let null_message: LedMessage = [0, 0, 0, 0];
+        self.spi.write(&null_message)?;
+        Ok(())
     }
 }
 
 fn main() {
     // println!("{}", get_pollen_count().unwrap());
-    let mut bar = LedBar::new(&[17, 18, 27, 22, 23, 24, 25, 12, 13, 19]);
-    bar.clear();
-    loop {
-        bar.test();
-    }
+    let mut led_array = LedArray::new(24).unwrap();
+    println!("Lights on");
+    led_array.render(&vec![
+        LedValue::new(6, 255, 255, 255, ).unwrap(),
+        LedValue::new(6, 255, 0, 0, ).unwrap(),
+        LedValue::new(6, 0, 255, 0, ).unwrap(),
+        LedValue::new(6, 0, 0, 255, ).unwrap(),
+        LedValue::new(31, 255, 255, 255, ).unwrap(),
+    ]).unwrap();
+    println!("Lights off");
 }
