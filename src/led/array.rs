@@ -4,6 +4,8 @@ use rppal::spi::{Bus, Mode, SlaveSelect, Spi};
 use std::thread;
 use std::time::Duration;
 
+const NULL_MESSAGE: LedMessage = [0, 0, 0, 0];
+
 pub struct LedArray {
     back_buffer: Vec<LedValue>,
     spi: Spi,
@@ -43,11 +45,7 @@ impl LedArray {
     }
 
     pub fn flush(&mut self) -> Result<()> {
-        const NULL_MESSAGE: LedMessage = [0, 0, 0, 0];
-        let num_flushes = (self.back_buffer.len() / 2) + 2;
-        for _ in 0..num_flushes {
-            self.spi.write(&NULL_MESSAGE)?;
-        }
+        self.spi.write(&NULL_MESSAGE)?;
         Ok(())
     }
 }
