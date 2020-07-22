@@ -3,7 +3,6 @@ use isahc::config::RedirectPolicy;
 use isahc::prelude::*;
 use isahc::ResponseExt;
 use scraper::{Html, Selector};
-use spidev::{SpiModeFlags, Spidev, SpidevOptions};
 use std::{
     convert::{TryFrom, TryInto},
     error::Error as StdError,
@@ -11,6 +10,7 @@ use std::{
     thread,
     time::Duration,
 };
+use rppal::spi::{Spi, Bus, SlaveSelect, Mode};
 
 type Result<T> = std::result::Result<T, Box<dyn StdError>>;
 
@@ -102,6 +102,7 @@ fn get_pollen_count() -> Result<PollenCount> {
     Ok(pollen_indicator.try_into()?)
 }
 
+#[derive(Clone, Debug)]
 struct LedValue {
     brightness: u8,
     blue: u8,
@@ -109,43 +110,62 @@ struct LedValue {
     red: u8,
 }
 
-type LedMessage =  [u8;4];
+type LedMessage = [u8; 4];
 
 impl LedValue {
     pub fn new(brightness: u8, red: u8, green: u8, blue: u8) -> Result<LedValue> {
-        if brightness > 31 {
-            Err(DumbError("brightness can not be higher than 31".to_string()).into())
-        } else {
-            Ok(LedValue { brightness, red, green, blue })
+        if brightness > 31u8 {
+            Err(DumbError(
+                "brightness can not be higher than 31".to_string(),
+            ))?;
         }
+        Ok(LedValue {
+            brightness,
+            red,
+            green,
+            blue,
+        })
     }
 
     pub fn as_array(&self) -> LedMessage {
-        [self.brightness + 224, self.blue, self.green, self.red]
+        const BRIGHTNESS_MOD: u8 = 224;
+        let brightness = self.brightness + BRIGHTNESS_MOD;
+        [brightness, self.blue, self.green, self.red]
+    }
+}
+
+impl Default for LedValue {
+    fn default() -> Self {
+        LedValue {
+            brightness: 0,
+            red: 255,
+            green: 255,
+            blue: 255,
+        }
     }
 }
 
 struct LedArray {
-    size: u8,
-    spi: Spidev,
+    back_buffer: Vec<LedValue>,
+    spi: Spi,
 }
 
 impl LedArray {
     fn new(size: u8) -> Result<LedArray> {
-        let mut spi = Spidev::open("/dev/spidev0.0")?;
-        let options = SpidevOptions::new()
-            .bits_per_word(8)
-            .max_speed_hz(30_000_000)
-            .mode(SpiModeFlags::SPI_MODE_1)
-            .build();
-        spi.configure(&options)?;
-        let mut led_array = LedArray { size, spi };
+        let mut spi = Spi::new(
+            Bus::Spi0,
+            SlaveSelect::Ss1,
+            30_000_000,
+            Mode::Mode0,
+        )?;
+        let back_buffer = vec![LedValue::default(); size as usize];
+        let mut led_array = LedArray { back_buffer, spi };
         led_array.flush()?;
         Ok(led_array)
     }
 
-    fn render(&mut self, led_values: &Vec<LedValue>) -> Result<()> {
-        for led_value in led_values {
+    fn render(&mut self) -> Result<()> {
+        for led_value in &self.back_buffer {
             let values = led_value.as_array();
             self.spi.write(&values)?;
         }
@@ -154,23 +174,47 @@ impl LedArray {
         Ok(())
     }
 
+    fn clear_back_buffer(&mut self) {
+        self.back_buffer = vec![LedValue::default(); self.back_buffer.len()];
+    }
+
+    fn set_led(&mut self, num: u8, value: LedValue) -> Result<()> {
+        if num as usize >= self.back_buffer.len() {
+            Err(DumbError(
+                "brightness can not be higher than 31".to_string(),
+            ))?;
+        }
+        self.back_buffer[num as usize] = value;
+        Ok(())
+    }
+
     fn flush(&mut self) -> Result<()> {
-        let null_message: LedMessage = [0, 0, 0, 0];
-        self.spi.write(&null_message)?;
+        const NULL_MESSAGE: LedMessage = [0, 0, 0, 0];
+        let num_flushes = (self.back_buffer.len() / 2) + 2;
+        for _ in 0..num_flushes {
+            self.spi.write(&NULL_MESSAGE)?;
+        }
         Ok(())
     }
 }
 
 fn main() {
-    // println!("{}", get_pollen_count().unwrap());
-    let mut led_array = LedArray::new(24).unwrap();
+    wrapper().unwrap();
+}
+
+fn wrapper() -> Result<()> {
+    // println!("{}", get_pollen_count()?);
+    let mut led_array = LedArray::new(24)?;
+
+    led_array.set_led(1, LedValue::new(1, 255, 255, 255)?)?;
+    led_array.set_led(2, LedValue::new(1, 255, 0, 0)?)?;
+    led_array.set_led(3, LedValue::new(1, 0, 255, 0)?)?;
+    led_array.set_led(4, LedValue::new(1, 0, 0, 255)?)?;
+    led_array.set_led(5, LedValue::new(1, 255, 255, 255)?)?;
     println!("Lights on");
-    led_array.render(&vec![
-        LedValue::new(6, 255, 255, 255, ).unwrap(),
-        LedValue::new(6, 255, 0, 0, ).unwrap(),
-        LedValue::new(6, 0, 255, 0, ).unwrap(),
-        LedValue::new(6, 0, 0, 255, ).unwrap(),
-        LedValue::new(31, 255, 255, 255, ).unwrap(),
-    ]).unwrap();
+    led_array.render()?;
+    led_array.clear_back_buffer();
     println!("Lights off");
+    led_array.render()?;
+    Ok(())
 }
