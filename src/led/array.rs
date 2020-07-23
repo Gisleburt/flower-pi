@@ -1,4 +1,4 @@
-use crate::led::{LedMessage, LedValue};
+use crate::led::{LedMessage, LedValue, LedWritable};
 use crate::{DumbError, Result};
 use rppal::spi::{Bus, Mode, SlaveSelect, Spi};
 use std::thread;
@@ -7,45 +7,38 @@ use std::time::Duration;
 const NULL_MESSAGE: LedMessage = [0, 0, 0, 0];
 
 pub struct LedArray {
-    back_buffer: Vec<LedValue>,
-    spi: Spi,
+    background: LedValue,
+    led_buffer: Vec<LedValue>,
 }
 
 impl LedArray {
-    pub fn new(size: u8) -> Result<LedArray> {
-        let spi = Spi::new(Bus::Spi0, SlaveSelect::Ss1, 30_000_000, Mode::Mode0)?;
-        let back_buffer = vec![LedValue::default(); size as usize];
-        let mut led_array = LedArray { back_buffer, spi };
-        led_array.flush()?;
-        Ok(led_array)
-    }
-
-    pub fn render(&mut self) -> Result<()> {
-        for led_value in &self.back_buffer {
-            let values = led_value.as_array();
-            self.spi.write(&values)?;
+    pub fn new(size: usize) -> LedArray {
+        LedArray {
+            background: LedValue::default(),
+            led_buffer: vec![LedValue::default(); size],
         }
-        self.flush()?;
-        thread::sleep(Duration::from_millis(50));
-        Ok(())
     }
 
-    pub fn clear_back_buffer(&mut self) {
-        self.back_buffer = vec![LedValue::default(); self.back_buffer.len()];
+    pub fn set_background(&mut self, background: LedValue) -> &mut Self {
+        self.background = background;
+        self
     }
 
-    pub fn set_led(&mut self, num: u8, value: LedValue) -> Result<()> {
-        if num as usize >= self.back_buffer.len() {
-            Err(DumbError(
-                "brightness can not be higher than 31".to_string(),
-            ))?;
-        }
-        self.back_buffer[num as usize] = value;
-        Ok(())
+    pub fn reset(&mut self) -> &mut Self {
+        self.led_buffer = vec![self.background.clone(); self.led_buffer.len()];
+        self
     }
 
-    pub fn flush(&mut self) -> Result<()> {
-        self.spi.write(&NULL_MESSAGE)?;
-        Ok(())
+    pub fn set_led(&mut self, led_num: usize, value: LedValue) -> Result<&mut Self> {
+        self.led_buffer.get_mut(led_num).map(|led| *led = value).ok_or_else(|| {
+            DumbError(format!("Invalid index {} in LedArray of size {}", led_num, self.led_buffer.len()))
+        })?;
+        Ok(self)
+    }
+}
+
+impl LedWritable for LedArray {
+    fn as_array(&self) -> &[LedValue] {
+        self.led_buffer.as_slice()
     }
 }

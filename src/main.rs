@@ -1,10 +1,13 @@
 mod led;
 mod pollen;
 
-use crate::led::{LedArray, LedValue};
-use crate::pollen::get_pollen_count;
+use crate::led::{LedArray, LedClock, LedInterface, LedValue};
+use crate::pollen::{get_pollen_count, PollenCount};
 use core::fmt;
+use std::convert::{TryFrom, TryInto};
 use std::error::Error;
+use std::thread;
+use std::time::Duration;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -23,18 +26,39 @@ fn main() {
     wrapper().unwrap();
 }
 
-fn wrapper() -> Result<()> {
-    println!("{}", get_pollen_count()?);
-    let mut led_array = LedArray::new(24)?;
+impl TryFrom<PollenCount> for LedValue {
+    type Error = Box<dyn Error>;
 
-    let mut pos = 5;
-
-    loop {
-        pos = (pos + 1) % 24;
-        led_array.clear_back_buffer();
-        led_array.set_led(pos, LedValue::new(1, 255, 0, 0)?)?;
-        led_array.set_led((pos + 1) % 24, LedValue::new(1, 0, 255, 0)?)?;
-        led_array.set_led((pos + 2) % 24, LedValue::new(1, 0, 0, 255)?)?;
-        led_array.render()?;
+    fn try_from(count: PollenCount) -> Result<Self> {
+        Ok(match count {
+            PollenCount::High => LedValue::new(1, 255, 0, 0)?, // Red
+            PollenCount::Medium => LedValue::new(1, 255, 200, 0)?, // Yellow
+            PollenCount::Low => LedValue::new(1, 0, 255, 0)?, // Green
+        })
     }
+}
+
+fn wrapper() -> Result<()> {
+    let mut interface = LedInterface::new(24)?;
+
+    let mut clock = LedClock::new(24);
+    // let background = get_pollen_count()?.try_into()?;
+    clock.set_background(LedValue::new(1, 255, 255, 255)?).update();
+    interface.write(&clock)?.flush()?;
+
+    // let mut led_array = LedArray::new(24);
+    //
+    // let mut pos = 0;
+    //
+    // loop {
+    //     pos = (pos + 1) % 24;
+    //     led_array.reset();
+    //     led_array.set_led(pos, LedValue::new(1, 255, 0, 0)?)?;
+    //     led_array.set_led((pos + 1) % 24, LedValue::new(1, 0, 255, 0)?)?;
+    //     led_array.set_led((pos + 2) % 24, LedValue::new(1, 0, 0, 255)?)?;
+    //     interface.write(&led_array)?.flush()?;
+    //     thread::sleep(Duration::from_millis(50));
+    // }
+
+    Ok(())
 }

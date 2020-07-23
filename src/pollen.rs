@@ -1,9 +1,12 @@
 use crate::{DumbError, Result};
-use core::{fmt, convert::{TryFrom, TryInto}};
-use std::error::Error as StdError;
-use scraper::{Selector, Html};
+use core::{
+    convert::{TryFrom, TryInto},
+    fmt,
+};
 use isahc::config::RedirectPolicy;
 use isahc::prelude::*;
+use scraper::{Html, Selector};
+use std::error::Error as StdError;
 
 #[derive(Debug)]
 pub struct PollenParseError(String);
