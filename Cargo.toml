@@ -8,6 +8,7 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+chrono = "0.4.13"
 isahc = "0.9.5"
 rppal = "0.11.3"
 scraper = "0.12.0"

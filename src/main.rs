@@ -9,7 +9,7 @@ use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::thread;
 use std::time::Duration;
-use crate::clock::FakeClock;
+use crate::clock::Clock;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -42,16 +42,16 @@ impl TryFrom<PollenCount> for LedValue {
 
 fn wrapper() -> Result<()> {
     let mut interface = LedInterface::new(24)?;
-    let clock = FakeClock::new();
+    let clock = Clock::new();
 
-    let mut led_clock = LedClock::new(24, clock);
+    let mut led_clock = LedClock::new(24, 12, clock);
     let background = get_pollen_count()?.try_into()?;
-    led_clock.set_background(background).update();
+    led_clock.set_background(background).update()?;
 
     loop {
         led_clock.update()?;
         interface.write(&led_clock)?.flush()?;
-        thread::sleep(Duration::from_millis(5));
+        thread::sleep(Duration::from_millis(100));
     }
 
     // let mut led_array = LedArray::new(24);
