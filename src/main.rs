@@ -2,14 +2,14 @@ mod clock;
 mod led;
 mod pollen;
 
-use crate::led::{LedClock, LedInterface, LedValue};
+use crate::led::{LedClock, LedInterface};
 use crate::pollen::{get_pollen_count, PollenCount};
+use crate::clock::Clock;
 use core::fmt;
-use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::thread;
 use std::time::Duration;
-use crate::clock::Clock;
+use crossbeam_channel::{tick, select, bounded, Sender};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -25,35 +25,58 @@ impl fmt::Display for DumbError {
 }
 
 fn main() {
-    wrapper().unwrap();
+    App::new().unwrap().run().unwrap();
 }
 
-impl TryFrom<PollenCount> for LedValue {
-    type Error = Box<dyn Error>;
+struct App {
+    interface: LedInterface,
+    led_clock: LedClock,
+}
 
-    fn try_from(count: PollenCount) -> Result<Self> {
-        Ok(match count {
-            PollenCount::High => LedValue::new(1, 255, 0, 0)?, // Red
-            PollenCount::Medium => LedValue::new(1, 255, 200, 0)?, // Yellow
-            PollenCount::Low => LedValue::new(1, 0, 255, 0)?, // Green
+impl App {
+    pub fn new() -> Result<App> {
+        let clock = Clock::new();
+        let led_clock = LedClock::new(24, 12, clock);
+        let interface = LedInterface::new(24)?;
+        Ok(App {
+            interface,
+            led_clock,
         })
     }
-}
 
-fn wrapper() -> Result<()> {
-    let mut interface = LedInterface::new(24)?;
-    let clock = Clock::new();
-
-    let mut led_clock = LedClock::new(24, 12, clock);
-    let background = get_pollen_count()?.try_into()?;
-    led_clock.set_background(background).update()?;
-
-    loop {
-        led_clock.update()?;
-        interface.write(&led_clock)?.flush()?;
-        thread::sleep(Duration::from_millis(100));
+    fn update_pollen_count(sender: Sender<Option<PollenCount>>) {
+        // Warning: This process is immediately orphaned
+        thread::spawn(move || {
+            let _ = sender.send(get_pollen_count().ok());
+        });
     }
 
+    pub fn run(&mut self) -> Result<()> {
+        let render = tick(Duration::from_millis(100));
+        let (pollen_sender, pollen_receiver) = bounded::<Option<PollenCount>>(100);
+        App::update_pollen_count(pollen_sender.clone());
+        let update_pollen_count = tick(Duration::from_secs(60 * 60));
+        loop {
+            select! {
+                recv(render) -> _ => {
+                    self.led_clock.update()?;
+                    self.interface.write(&self.led_clock)?.flush()?;
+                }
+                recv(pollen_receiver) -> pollen_result => {
+                    match pollen_result {
+                        Err(e) => panic!(e), // ToDo: Handle this
+                        Ok(pollen_count) => self.led_clock.set_background(pollen_count.into()),
+                    };
+                }
+                recv(update_pollen_count) -> _ => {
+                    App::update_pollen_count(pollen_sender.clone());
+                }
+            }
+        }
+    }
+}
+
+// fn wrapper() -> Result<()> {
     // let mut led_array = LedArray::new(24);
     //
     // let mut pos = 0;
@@ -67,4 +90,4 @@ fn wrapper() -> Result<()> {
     //     interface.write(&led_array)?.flush()?;
     //     thread::sleep(Duration::from_millis(50));
     // }
-}
+// }

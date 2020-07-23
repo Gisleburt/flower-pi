@@ -49,3 +49,10 @@ impl LedInterface {
         Ok(self)
     }
 }
+
+impl Drop for LedInterface {
+    fn drop(&mut self) {
+        self.back_buffer = vec![LedValue::default(); self.back_buffer.len()];
+        let _ = self.flush();
+    }
+}

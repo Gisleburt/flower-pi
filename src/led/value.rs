@@ -1,5 +1,6 @@
 use crate::led::LedMessage;
 use crate::{DumbError, Result};
+use crate::pollen::PollenCount;
 
 #[derive(Clone, Debug)]
 pub struct LedValue {
@@ -38,6 +39,21 @@ impl Default for LedValue {
             red: 255,
             green: 255,
             blue: 255,
+        }
+    }
+}
+
+const RED: LedValue = LedValue { brightness: 1, red: 255, green: 0, blue: 0};
+const YELLOW: LedValue = LedValue { brightness: 1, red: 255, green: 150, blue: 0};
+const GREEN: LedValue = LedValue { brightness: 1, red: 0, green: 255, blue: 0};
+
+impl From<Option<PollenCount>> for LedValue {
+    fn from(count: Option<PollenCount>) -> Self {
+        match count {
+            Some(PollenCount::High) => RED.clone(), // Red
+            Some(PollenCount::Medium) => YELLOW.clone(), // Yellow
+            Some(PollenCount::Low) => GREEN.clone(), // Green
+            None => LedValue::default(),
         }
     }
 }
