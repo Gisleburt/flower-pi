@@ -1,13 +1,15 @@
+mod clock;
 mod led;
 mod pollen;
 
-use crate::led::{LedArray, LedClock, LedInterface, LedValue};
+use crate::led::{LedClock, LedInterface, LedValue};
 use crate::pollen::{get_pollen_count, PollenCount};
 use core::fmt;
 use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::thread;
 use std::time::Duration;
+use crate::clock::FakeClock;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -40,11 +42,17 @@ impl TryFrom<PollenCount> for LedValue {
 
 fn wrapper() -> Result<()> {
     let mut interface = LedInterface::new(24)?;
+    let clock = FakeClock::new();
 
-    let mut clock = LedClock::new(24);
-    // let background = get_pollen_count()?.try_into()?;
-    clock.set_background(LedValue::new(1, 255, 255, 255)?).update();
-    interface.write(&clock)?.flush()?;
+    let mut led_clock = LedClock::new(24, clock);
+    let background = get_pollen_count()?.try_into()?;
+    led_clock.set_background(background).update();
+
+    loop {
+        led_clock.update()?;
+        interface.write(&led_clock)?.flush()?;
+        thread::sleep(Duration::from_millis(5));
+    }
 
     // let mut led_array = LedArray::new(24);
     //
@@ -59,6 +67,4 @@ fn wrapper() -> Result<()> {
     //     interface.write(&led_array)?.flush()?;
     //     thread::sleep(Duration::from_millis(50));
     // }
-
-    Ok(())
 }

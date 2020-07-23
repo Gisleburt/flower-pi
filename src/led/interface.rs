@@ -1,8 +1,6 @@
 use crate::led::{LedMessage, LedValue};
 use crate::{DumbError, Result};
 use rppal::spi::{Bus, Mode, SlaveSelect, Spi};
-use std::thread;
-use std::time::Duration;
 
 const NULL_MESSAGE: LedMessage = [0, 0, 0, 0];
 
