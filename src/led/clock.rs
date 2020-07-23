@@ -32,15 +32,19 @@ impl LedClock {
         Ok(self)
     }
 
+    fn fit_index_to_buffer(&self, index: usize, divisor: usize) -> usize {
+        (((index * self.led_buffer.len()) / divisor) + self.led_offset) % self.led_buffer.len()
+    }
+
     pub fn update(&mut self) -> Result<&mut Self> {
         self.led_buffer = vec![self.background.clone(); self.led_buffer.len()];
-        let seconds = (((self.clock.get_seconds() * self.led_buffer.len()) / 60) + self.led_offset) % 24;
-        let minutes = (((self.clock.get_minutes() * self.led_buffer.len()) / 60) + self.led_offset) % 24;
-        let hours = (((self.clock.get_hours() * self.led_buffer.len()) / 12) + self.led_offset) % 24;
-        self.set_led(seconds, LedValue::new(1, 0, 0, 255)?)?;
+        let hours = self.fit_index_to_buffer(self.clock.get_hours(), 12);
+        let minutes = self.fit_index_to_buffer(self.clock.get_minutes(), 60);
+        let seconds = self.fit_index_to_buffer(self.clock.get_seconds(), 60);
+        self.set_led(hours, LedValue::new(1, 255, 0, 255)?)?;
+        self.set_led(hours + 1, LedValue::new(1, 255, 0, 255)?)?;
         self.set_led(minutes, LedValue::new(1, 0, 0, 255)?)?;
-        self.set_led(hours, LedValue::new(1, 0, 0, 255)?)?;
-        self.set_led(hours + 1, LedValue::new(1, 0, 0, 255)?)?;
+        self.set_led(seconds, LedValue::new(1, 0, 0, 255)?)?;
         Ok(self)
     }
 }
