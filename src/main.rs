@@ -75,19 +75,3 @@ impl App {
         }
     }
 }
-
-// fn wrapper() -> Result<()> {
-    // let mut led_array = LedArray::new(24);
-    //
-    // let mut pos = 0;
-    //
-    // loop {
-    //     pos = (pos + 1) % 24;
-    //     led_array.reset();
-    //     led_array.set_led(pos, LedValue::new(1, 255, 0, 0)?)?;
-    //     led_array.set_led((pos + 1) % 24, LedValue::new(1, 0, 255, 0)?)?;
-    //     led_array.set_led((pos + 2) % 24, LedValue::new(1, 0, 0, 255)?)?;
-    //     interface.write(&led_array)?.flush()?;
-    //     thread::sleep(Duration::from_millis(50));
-    // }
-// }

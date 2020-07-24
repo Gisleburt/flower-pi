@@ -1,0 +1,19 @@
+[Unit]
+Description=Flower clock and pollen count display
+Wants=multi-user.target
+
+[Service]
+# Ideally we want to Wants=network-online.target however due to a bug
+# this is broken on raspberry pi. It is fixable, but we can also just
+# ping google until we get a good response
+ExecStartPre=/bin/sh -c 'until ping -c1 google.com; do sleep 1; done;'
+ExecStart=/home/pi/flower
+Restart=always
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=FLOWER
+User=pi
+Group=pi
+
+[Install]
+WantedBy=multi-user.target
