@@ -3,16 +3,17 @@ mod error;
 mod led;
 mod pollen;
 
-use crate::led::{LedClock, LedInterface, LedValue};
+use crate::led::{LedClock, LedInterface};
 use crate::pollen::{get_pollen_count, PollenCount};
 use crate::clock::Clock;
-use crate::error::{Result, ErrorHandler, FlowerError};
+use crate::error::{Result, ErrorHandler};
 use std::{thread, env};
 use std::time::Duration;
-use crossbeam_channel::{tick, select, bounded, Sender};
+use crossbeam_channel::{tick, select, bounded, Sender, Receiver};
+use signal_hook::{iterator::Signals, SIGALRM, SIGHUP, SIGINT, SIGPIPE, SIGPROF, SIGTERM, SIGUSR1, SIGUSR2};
 
 fn main() {
-    App::new().unwrap().run().unwrap();
+    App::new().unwrap().run();
 }
 
 struct App {
@@ -46,7 +47,31 @@ impl App {
         });
     }
 
-    pub fn run(&mut self) -> Result<()> {
+    fn get_signal_receiver() -> Receiver<i32> {
+        // Warning: This process is immediately orphaned
+        let (signal_sender, signal_receiver) = bounded::<i32>(10);
+        thread::spawn(move || {
+            let signals = Signals::new(&[SIGALRM, SIGHUP, SIGINT, SIGPIPE, SIGPROF, SIGTERM, SIGUSR1, SIGUSR2]).unwrap();
+            for sig in signals.forever() {
+                match sig {
+                    SIGALRM => println!("received SIGALRM"),
+                    SIGHUP => println!("received SIGHUP"),
+                    SIGINT => println!("received SIGINT"),
+                    SIGPIPE => println!("received SIGPIPE"),
+                    SIGPROF => println!("received SIGPROF"),
+                    SIGTERM => println!("received SIGTERM"),
+                    SIGUSR1 => println!("received SIGUSR1"),
+                    SIGUSR2 => println!("received SIGUSR2"),
+                    _ => println!("unknown signal received"),
+                }
+                let _ = signal_sender.send(sig); // We're quitting now, not a lot else to do
+                break; // All signals terminate so kill this thread
+            }
+        });
+        signal_receiver
+    }
+
+    pub fn run(&mut self) {
         let mut error_count = 0;
         while error_count < 5 {
             match self.enter_render_loop() {
@@ -57,17 +82,20 @@ impl App {
                 }
             }
         }
-        self.interface.fill(LedValue::new(0, 255, 255, 255)?)?.flush()?;
-        Ok(())
     }
 
     pub fn enter_render_loop(&mut self) -> Result<()> {
+        let (pollen_sender, pollen_receiver) = bounded::<Option<PollenCount>>(1);
+        let sig_receiver = App::get_signal_receiver();
         let render = tick(Duration::from_millis(100));
-        let (pollen_sender, pollen_receiver) = bounded::<Option<PollenCount>>(100);
-        App::update_pollen_count(pollen_sender.clone());
         let update_pollen_count = tick(Duration::from_secs(60 * 60));
+
+        App::update_pollen_count(pollen_sender.clone()); // One off run
         loop {
             select! {
+                recv(sig_receiver) -> _ => {
+                    return Ok(());
+                }
                 recv(render) -> _ => {
                     self.led_clock.update()?;
                     self.interface.write(&self.led_clock)?.flush()?;
@@ -83,5 +111,6 @@ impl App {
                 }
             }
         }
+
     }
 }
