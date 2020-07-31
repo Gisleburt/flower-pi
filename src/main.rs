@@ -57,20 +57,44 @@ impl App {
                 SIGALRM, SIGHUP, SIGINT, SIGPIPE, SIGPROF, SIGTERM, SIGUSR1, SIGUSR2,
             ])
             .unwrap();
-            let sig = signals.wait().next();
-            match sig {
-                Some(SIGALRM) => println!("received SIGALRM"),
-                Some(SIGHUP) => println!("received SIGHUP"),
-                Some(SIGINT) => println!("received SIGINT"),
-                Some(SIGPIPE) => println!("received SIGPIPE"),
-                Some(SIGPROF) => println!("received SIGPROF"),
-                Some(SIGTERM) => println!("received SIGTERM"),
-                Some(SIGUSR1) => println!("received SIGUSR1"),
-                Some(SIGUSR2) => println!("received SIGUSR2"),
-                Some(_) => println!("unknown signal received"),
-                None => println!("signal handler returned without handling a signal"),
+            for signal in signals.forever() {
+                match signal {
+                    SIGALRM => {
+                        println!("received SIGALRM");
+                        break;
+                    }
+                    SIGHUP => {
+                        println!("received SIGHUP");
+                        break;
+                    }
+                    SIGINT => {
+                        println!("received SIGINT");
+                        break;
+                    }
+                    SIGPIPE => {
+                        println!("received SIGPIPE");
+                        break;
+                    }
+                    SIGPROF => {
+                        println!("received SIGPROF");
+                        break;
+                    }
+                    SIGTERM => {
+                        println!("received SIGTERM");
+                        break;
+                    }
+                    SIGUSR1 => {
+                        println!("received SIGUSR1");
+                        break;
+                    }
+                    SIGUSR2 => {
+                        println!("received SIGUSR2");
+                        break;
+                    }
+                    _ => println!("unknown signal received"),
+                }
+                let _ = signal_sender.send(signal); // We're quitting now, not a lot else to do
             }
-            let _ = signal_sender.send(sig.unwrap()); // We're quitting now, not a lot else to do
         });
         signal_receiver
     }
