@@ -1,28 +1,15 @@
 mod clock;
+mod error;
 mod led;
 mod pollen;
 
-use crate::led::{LedClock, LedInterface};
+use crate::led::{LedClock, LedInterface, LedValue};
 use crate::pollen::{get_pollen_count, PollenCount};
 use crate::clock::Clock;
-use core::fmt;
-use std::error::Error;
-use std::thread;
+use crate::error::{Result, ErrorHandler, FlowerError};
+use std::{thread, env};
 use std::time::Duration;
 use crossbeam_channel::{tick, select, bounded, Sender};
-
-type Result<T> = std::result::Result<T, Box<dyn Error>>;
-
-#[derive(Debug)]
-struct DumbError(String);
-
-impl Error for DumbError {}
-
-impl fmt::Display for DumbError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
 
 fn main() {
     App::new().unwrap().run().unwrap();
@@ -31,17 +18,25 @@ fn main() {
 struct App {
     interface: LedInterface,
     led_clock: LedClock,
+    error_handler: ErrorHandler,
 }
 
 impl App {
     pub fn new() -> Result<App> {
+        let error_handler = ErrorHandler::new(&env::var("IFTTT_KEY").unwrap());
         let clock = Clock::new();
         let led_clock = LedClock::new(24, 12, clock);
-        let interface = LedInterface::new(24)?;
-        Ok(App {
-            interface,
-            led_clock,
-        })
+        match LedInterface::new(24) {
+            Err(error) => {
+                error_handler.handle_error(&error);
+                panic!("{:?}", error);
+            }
+            Ok(interface) => Ok(App {
+                interface,
+                led_clock,
+                error_handler,
+            }),
+        }
     }
 
     fn update_pollen_count(sender: Sender<Option<PollenCount>>) {
@@ -52,6 +47,21 @@ impl App {
     }
 
     pub fn run(&mut self) -> Result<()> {
+        let mut error_count = 0;
+        while error_count < 5 {
+            match self.enter_render_loop() {
+                Ok(_) => break,
+                Err(e) => {
+                    self.error_handler.handle_error(&e);
+                    error_count = error_count + 1;
+                }
+            }
+        }
+        self.interface.fill(LedValue::new(0, 255, 255, 255)?)?.flush()?;
+        Ok(())
+    }
+
+    pub fn enter_render_loop(&mut self) -> Result<()> {
         let render = tick(Duration::from_millis(100));
         let (pollen_sender, pollen_receiver) = bounded::<Option<PollenCount>>(100);
         App::update_pollen_count(pollen_sender.clone());

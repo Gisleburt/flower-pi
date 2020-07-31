@@ -10,6 +10,10 @@ license = "MIT"
 [dependencies]
 chrono = "0.4"
 crossbeam-channel = "0.4"
-isahc = "0.9"
+isahc = { version = "0.9", features = ["json"] }
 rppal = "0.11"
 scraper = "0.12"
+serde = { version = "1.0.114", features = ["derive"] }
+serde_json = "1.0.56"
+thiserror = "1.0.20"
+anyhow = "1.0.32"

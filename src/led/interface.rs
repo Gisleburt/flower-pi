@@ -1,6 +1,6 @@
 use crate::led::{LedMessage, LedValue};
-use crate::{DumbError, Result};
 use rppal::spi::{Bus, Mode, SlaveSelect, Spi};
+use crate::error::{FlowerError, Result};
 
 const NULL_MESSAGE: LedMessage = [0, 0, 0, 0];
 
@@ -31,11 +31,16 @@ impl LedInterface {
     pub fn write<W: LedWritable>(&mut self, writable: &W) -> Result<&mut Self> {
         let slice = writable.as_array();
         if self.back_buffer.len() + slice.len() > self.size {
-            Err(DumbError(
+            Err(FlowerError::SimpleError(
                 "writing this slice would overflow the back buffer".to_string(),
             ))?;
         }
         self.back_buffer.extend_from_slice(slice);
+        Ok(self)
+    }
+
+    pub fn fill(&mut self, led_value: LedValue) -> Result<&mut Self> {
+        self.back_buffer = vec![led_value; self.size];
         Ok(self)
     }
 

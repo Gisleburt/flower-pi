@@ -1,6 +1,7 @@
 use crate::led::LedMessage;
-use crate::{DumbError, Result};
+use crate::{Result};
 use crate::pollen::PollenCount;
+use crate::error::FlowerError;
 
 #[derive(Clone, Debug)]
 pub struct LedValue {
@@ -13,7 +14,7 @@ pub struct LedValue {
 impl LedValue {
     pub fn new(brightness: u8, red: u8, green: u8, blue: u8) -> Result<LedValue> {
         if brightness > 31u8 {
-            Err(DumbError(
+            Err(FlowerError::SimpleError(
                 "brightness can not be higher than 31".to_string(),
             ))?;
         }
