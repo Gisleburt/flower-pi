@@ -1,4 +1,4 @@
-.PHONY: build deploy run
+.PHONY: build deploy run clippy
 
 flower-binary = target/arm-unknown-linux-musleabi/debug/flower
 registry-cache = "$(PWD)/target/.registry"
@@ -14,3 +14,7 @@ deploy: build
 
 run: deploy
 	ssh pi@piflower.local '~/flower'
+
+clippy:
+	mkdir -p "$(registry-cache)"
+	docker run --rm -it -v "$(registry-cache)":/root/.cargo/registry -v "$(PWD)":/home/rust/src messense/rust-musl-cross:arm-musleabi cargo clippy

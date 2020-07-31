@@ -1,9 +1,9 @@
-use thiserror::Error as ThisError;
+use crate::pollen::PollenParseError;
 use anyhow::Error as AnyHowError;
+use isahc::prelude::*;
 use serde::Serialize;
 use serde_json::json;
-use isahc::prelude::*;
-use crate::pollen::PollenParseError;
+use thiserror::Error as ThisError;
 
 pub type Result<T> = anyhow::Result<T>;
 
@@ -35,7 +35,7 @@ impl From<&AnyHowError> for ErrorMessage {
             _ => ErrorMessage {
                 value1: Some(format!("{:?}", error)),
                 ..Default::default()
-            }
+            },
         }
     }
 }
@@ -47,7 +47,10 @@ pub struct ErrorHandler {
 impl ErrorHandler {
     pub fn new(ifttt_key: &str) -> ErrorHandler {
         ErrorHandler {
-            hook_uri: format!("https://maker.ifttt.com/trigger/flower/with/key/{}", ifttt_key),
+            hook_uri: format!(
+                "https://maker.ifttt.com/trigger/flower/with/key/{}",
+                ifttt_key
+            ),
         }
     }
 

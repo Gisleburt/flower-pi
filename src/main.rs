@@ -3,14 +3,16 @@ mod error;
 mod led;
 mod pollen;
 
+use crate::clock::Clock;
+use crate::error::{ErrorHandler, Result};
 use crate::led::{LedClock, LedInterface};
 use crate::pollen::{get_pollen_count, PollenCount};
-use crate::clock::Clock;
-use crate::error::{Result, ErrorHandler};
-use std::{thread, env};
+use crossbeam_channel::{bounded, select, tick, Receiver, Sender};
+use signal_hook::{
+    iterator::Signals, SIGALRM, SIGHUP, SIGINT, SIGPIPE, SIGPROF, SIGTERM, SIGUSR1, SIGUSR2,
+};
 use std::time::Duration;
-use crossbeam_channel::{tick, select, bounded, Sender, Receiver};
-use signal_hook::{iterator::Signals, SIGALRM, SIGHUP, SIGINT, SIGPIPE, SIGPROF, SIGTERM, SIGUSR1, SIGUSR2};
+use std::{env, thread};
 
 fn main() {
     App::new().unwrap().run();
@@ -51,22 +53,24 @@ impl App {
         // Warning: This process is immediately orphaned
         let (signal_sender, signal_receiver) = bounded::<i32>(10);
         thread::spawn(move || {
-            let signals = Signals::new(&[SIGALRM, SIGHUP, SIGINT, SIGPIPE, SIGPROF, SIGTERM, SIGUSR1, SIGUSR2]).unwrap();
-            for sig in signals.forever() {
-                match sig {
-                    SIGALRM => println!("received SIGALRM"),
-                    SIGHUP => println!("received SIGHUP"),
-                    SIGINT => println!("received SIGINT"),
-                    SIGPIPE => println!("received SIGPIPE"),
-                    SIGPROF => println!("received SIGPROF"),
-                    SIGTERM => println!("received SIGTERM"),
-                    SIGUSR1 => println!("received SIGUSR1"),
-                    SIGUSR2 => println!("received SIGUSR2"),
-                    _ => println!("unknown signal received"),
-                }
-                let _ = signal_sender.send(sig); // We're quitting now, not a lot else to do
-                break; // All signals terminate so kill this thread
+            let signals = Signals::new(&[
+                SIGALRM, SIGHUP, SIGINT, SIGPIPE, SIGPROF, SIGTERM, SIGUSR1, SIGUSR2,
+            ])
+            .unwrap();
+            let sig = signals.wait().next();
+            match sig {
+                Some(SIGALRM) => println!("received SIGALRM"),
+                Some(SIGHUP) => println!("received SIGHUP"),
+                Some(SIGINT) => println!("received SIGINT"),
+                Some(SIGPIPE) => println!("received SIGPIPE"),
+                Some(SIGPROF) => println!("received SIGPROF"),
+                Some(SIGTERM) => println!("received SIGTERM"),
+                Some(SIGUSR1) => println!("received SIGUSR1"),
+                Some(SIGUSR2) => println!("received SIGUSR2"),
+                Some(_) => println!("unknown signal received"),
+                None => println!("signal handler returned without handling a signal"),
             }
+            let _ = signal_sender.send(sig.unwrap()); // We're quitting now, not a lot else to do
         });
         signal_receiver
     }
@@ -78,7 +82,7 @@ impl App {
                 Ok(_) => break,
                 Err(e) => {
                     self.error_handler.handle_error(&e);
-                    error_count = error_count + 1;
+                    error_count += 1;
                 }
             }
         }
@@ -111,6 +115,5 @@ impl App {
                 }
             }
         }
-
     }
 }

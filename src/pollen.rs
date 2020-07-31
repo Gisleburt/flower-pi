@@ -1,4 +1,5 @@
-use crate::{Result};
+use crate::error::FlowerError;
+use crate::Result;
 use core::{
     convert::{TryFrom, TryInto},
     fmt,
@@ -7,7 +8,6 @@ use isahc::config::RedirectPolicy;
 use isahc::prelude::*;
 use scraper::{Html, Selector};
 use std::error::Error as StdError;
-use crate::error::FlowerError;
 
 #[derive(Debug)]
 pub struct PollenParseError(String);
@@ -66,8 +66,8 @@ pub fn get_pollen_count() -> Result<PollenCount> {
 
     let document = Html::parse_document(html.as_str());
     //*[@id="se"]/table/tbody/tr/td[1]/div/span
-    let se_selector =
-        Selector::parse("#se").map_err(|_| FlowerError::SimpleError("Could not create #se parser".to_string()))?;
+    let se_selector = Selector::parse("#se")
+        .map_err(|_| FlowerError::SimpleError("Could not create #se parser".to_string()))?;
     let se = document
         .select(&se_selector)
         .next()
@@ -75,13 +75,11 @@ pub fn get_pollen_count() -> Result<PollenCount> {
 
     let span_selector = Selector::parse("span")
         .map_err(|_| FlowerError::SimpleError("Could not create #se parser".to_string()))?;
-    let today = se
-        .select(&span_selector)
-        .next()
-        .ok_or_else(|| FlowerError::SimpleError("today span (the first span) was not found".to_string()))?;
-    let pollen_indicator = today
-        .value()
-        .attr("data-category")
-        .ok_or_else(|| FlowerError::SimpleError("No data-category attribute found on today span".to_string()))?;
+    let today = se.select(&span_selector).next().ok_or_else(|| {
+        FlowerError::SimpleError("today span (the first span) was not found".to_string())
+    })?;
+    let pollen_indicator = today.value().attr("data-category").ok_or_else(|| {
+        FlowerError::SimpleError("No data-category attribute found on today span".to_string())
+    })?;
     Ok(pollen_indicator.try_into()?)
 }

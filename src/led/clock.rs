@@ -1,7 +1,7 @@
-use crate::led::interface::LedWritable;
-use crate::led::LedValue;
 use crate::clock::Clock;
 use crate::error::{FlowerError, Result};
+use crate::led::interface::LedWritable;
+use crate::led::LedValue;
 
 pub struct LedClock {
     clock: Clock,
@@ -26,9 +26,16 @@ impl LedClock {
     }
 
     fn set_led(&mut self, led_num: usize, value: LedValue) -> Result<&mut Self> {
-        self.led_buffer.get_mut(led_num).map(|led| *led = value).ok_or_else(|| {
-            FlowerError::SimpleError(format!("Invalid index {} in LedArray of size {}", led_num, self.led_buffer.len()))
-        })?;
+        self.led_buffer
+            .get_mut(led_num)
+            .map(|led| *led = value)
+            .ok_or_else(|| {
+                FlowerError::SimpleError(format!(
+                    "Invalid index {} in LedArray of size {}",
+                    led_num,
+                    self.led_buffer.len()
+                ))
+            })?;
         Ok(self)
     }
 
