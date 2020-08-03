@@ -2,15 +2,14 @@ mod clock;
 mod error;
 mod led;
 mod pollen;
+mod signal;
 
 use crate::clock::Clock;
 use crate::error::{ErrorHandler, Result};
 use crate::led::{LedClock, LedInterface};
 use crate::pollen::{get_pollen_count, PollenCount};
-use crossbeam_channel::{bounded, select, tick, Receiver, Sender};
-use signal_hook::{
-    iterator::Signals, SIGALRM, SIGHUP, SIGINT, SIGPIPE, SIGPROF, SIGTERM, SIGUSR1, SIGUSR2,
-};
+use crate::signal::Signal;
+use crossbeam_channel::{bounded, select, tick, Sender};
 use std::time::Duration;
 use std::{env, thread};
 
@@ -49,56 +48,6 @@ impl App {
         });
     }
 
-    fn get_signal_receiver() -> Receiver<i32> {
-        // Warning: This process is immediately orphaned
-        let (signal_sender, signal_receiver) = bounded::<i32>(10);
-        thread::spawn(move || {
-            let signals = Signals::new(&[
-                SIGALRM, SIGHUP, SIGINT, SIGPIPE, SIGPROF, SIGTERM, SIGUSR1, SIGUSR2,
-            ])
-            .unwrap();
-            for signal in signals.forever() {
-                match signal {
-                    SIGALRM => {
-                        println!("received SIGALRM");
-                        break;
-                    }
-                    SIGHUP => {
-                        println!("received SIGHUP");
-                        break;
-                    }
-                    SIGINT => {
-                        println!("received SIGINT");
-                        break;
-                    }
-                    SIGPIPE => {
-                        println!("received SIGPIPE");
-                        break;
-                    }
-                    SIGPROF => {
-                        println!("received SIGPROF");
-                        break;
-                    }
-                    SIGTERM => {
-                        println!("received SIGTERM");
-                        break;
-                    }
-                    SIGUSR1 => {
-                        println!("received SIGUSR1");
-                        break;
-                    }
-                    SIGUSR2 => {
-                        println!("received SIGUSR2");
-                        break;
-                    }
-                    _ => println!("unknown signal received"),
-                }
-                let _ = signal_sender.send(signal); // We're quitting now, not a lot else to do
-            }
-        });
-        signal_receiver
-    }
-
     pub fn run(&mut self) {
         let mut error_count = 0;
         while error_count < 5 {
@@ -114,7 +63,7 @@ impl App {
 
     pub fn enter_render_loop(&mut self) -> Result<()> {
         let (pollen_sender, pollen_receiver) = bounded::<Option<PollenCount>>(1);
-        let sig_receiver = App::get_signal_receiver();
+        let sig_receiver = Signal::get_exit_receiver();
         let render = tick(Duration::from_millis(100));
         let update_pollen_count = tick(Duration::from_secs(60 * 60));
 
