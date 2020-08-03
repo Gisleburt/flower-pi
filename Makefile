@@ -13,7 +13,7 @@ deploy: build
 	scp $(flower-binary) pi@piflower.local:/home/pi
 
 run: deploy
-	ssh pi@piflower.local '~/flower'
+	ssh -t -t pi@piflower.local '~/flower'
 
 clippy:
 	mkdir -p "$(registry-cache)"
