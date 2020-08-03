@@ -1,12 +1,14 @@
 mod clock;
 mod error;
 mod led;
+mod pir;
 mod pollen;
 mod signal;
 
 use crate::clock::Clock;
 use crate::error::{ErrorHandler, Result};
 use crate::led::{LedClock, LedInterface};
+use crate::pir::PassiveInfraRedSensor;
 use crate::pollen::{get_pollen_count, PollenCount};
 use crate::signal::Signal;
 use crossbeam_channel::{bounded, select, tick, Sender};
@@ -66,6 +68,8 @@ impl App {
         let sig_receiver = Signal::get_exit_receiver();
         let render = tick(Duration::from_millis(100));
         let update_pollen_count = tick(Duration::from_secs(60 * 60));
+        let pir = PassiveInfraRedSensor::new(17)?;
+        let pir_receiver = pir.get_receiver();
 
         App::update_pollen_count(pollen_sender.clone()); // One off run
         loop {
@@ -79,12 +83,19 @@ impl App {
                 }
                 recv(pollen_receiver) -> pollen_result => {
                     match pollen_result {
-                        Err(e) => panic!(e), // ToDo: Handle this
                         Ok(pollen_count) => self.led_clock.set_background(pollen_count.into()),
+                        Err(e) => return Err(e.into()),
                     };
                 }
                 recv(update_pollen_count) -> _ => {
                     App::update_pollen_count(pollen_sender.clone());
+                }
+                recv(pir_receiver) -> pir_detection => {
+                    match pir_detection {
+                        Ok(true) => println!("detection"),
+                        Ok(false) => println!("no detection"),
+                        Err(e) => return Err(e.into()),
+                    }
                 }
             }
         }
