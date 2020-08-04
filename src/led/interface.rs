@@ -41,6 +41,11 @@ impl LedInterface {
         }
     }
 
+    pub fn clear(&mut self) -> &mut Self {
+        self.back_buffer = vec![LedValue::default(); self.size];
+        self
+    }
+
     pub fn flush(&mut self) -> Result<&mut Self> {
         // Drain the back buffer into the spi interface
         for led_value in self.back_buffer.drain(..).into_iter() {
@@ -54,7 +59,6 @@ impl LedInterface {
 
 impl Drop for LedInterface {
     fn drop(&mut self) {
-        self.back_buffer = vec![LedValue::default(); self.size];
-        let _ = self.flush();
+        let _ = self.clear().flush();
     }
 }

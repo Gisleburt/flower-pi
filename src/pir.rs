@@ -1,6 +1,6 @@
 use crate::Result;
 use crossbeam_channel::{bounded, Receiver};
-use rppal::gpio::{Gpio, InputPin, Level, Trigger};
+use rppal::gpio::{Gpio, Level, Trigger};
 use std::{thread, thread::JoinHandle};
 
 pub struct PassiveInfraRedSensor {
@@ -26,7 +26,6 @@ impl PassiveInfraRedSensor {
                     _ => {}
                 }
             }
-            Ok(())
         });
         Ok(Self { handle, receiver })
     }

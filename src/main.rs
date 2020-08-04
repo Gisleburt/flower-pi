@@ -11,7 +11,7 @@ use crate::led::{LedClock, LedInterface};
 use crate::pir::PassiveInfraRedSensor;
 use crate::pollen::{get_pollen_count, PollenCount};
 use crate::signal::Signal;
-use crossbeam_channel::{bounded, select, tick, Sender};
+use crossbeam_channel::{after, bounded, never, select, tick, Sender};
 use std::time::Duration;
 use std::{env, thread};
 
@@ -70,6 +70,8 @@ impl App {
         let update_pollen_count = tick(Duration::from_secs(60 * 60));
         let pir = PassiveInfraRedSensor::new(17)?;
         let pir_receiver = pir.get_receiver();
+        let mut should_render = false;
+        let mut timeout_render = None;
 
         App::update_pollen_count(pollen_sender.clone()); // One off run
         loop {
@@ -78,8 +80,10 @@ impl App {
                     return Ok(());
                 }
                 recv(render) -> _ => {
-                    self.led_clock.update()?;
-                    self.interface.write(&self.led_clock)?.flush()?;
+                    if should_render {
+                        self.led_clock.update()?;
+                        self.interface.write(&self.led_clock)?.flush()?;
+                    }
                 }
                 recv(pollen_receiver) -> pollen_result => {
                     match pollen_result {
@@ -92,10 +96,15 @@ impl App {
                 }
                 recv(pir_receiver) -> pir_detection => {
                     match pir_detection {
-                        Ok(true) => println!("detection"),
-                        Ok(false) => println!("no detection"),
+                        Ok(true) => should_render = true,
+                        Ok(false) => timeout_render = Some(after(Duration::from_secs(10))),
                         Err(e) => return Err(e.into()),
                     }
+                }
+                recv(timeout_render.as_ref().unwrap_or(&never())) -> _ => {
+                    timeout_render = None;
+                    should_render = false;
+                    self.interface.clear().flush()?;
                 }
             }
         }
