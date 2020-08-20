@@ -2,10 +2,14 @@ use crate::clock::Clock;
 use crate::error::{FlowerError, Result};
 use crate::led::interface::LedWritable;
 use crate::led::LedValue;
+use crate::led::value::{LED_LOW_PURPLE, LED_LOW_BLUE, LED_LOW_AQUA};
 
 pub struct LedClock {
     clock: Clock,
     background: LedValue,
+    hour: LedValue,
+    minute: LedValue,
+    second: LedValue,
     led_buffer: Vec<LedValue>,
     led_offset: usize,
 }
@@ -16,6 +20,9 @@ impl LedClock {
             clock,
             led_offset,
             background: LedValue::default(),
+            hour: LED_LOW_PURPLE.clone(),
+            minute: LED_LOW_BLUE.clone(),
+            second: LED_LOW_AQUA.clone(),
             led_buffer: vec![LedValue::default(); num_leds],
         }
     }
@@ -48,10 +55,10 @@ impl LedClock {
         let hours = self.fit_index_to_buffer(self.clock.get_hours(), 12);
         let minutes = self.fit_index_to_buffer(self.clock.get_minutes(), 60);
         let seconds = self.fit_index_to_buffer(self.clock.get_seconds(), 60);
-        self.set_led(hours, LedValue::new(1, 255, 0, 255)?)?;
-        self.set_led(hours + 1, LedValue::new(1, 255, 0, 255)?)?;
-        self.set_led(minutes, LedValue::new(1, 0, 0, 255)?)?;
-        self.set_led(seconds, LedValue::new(1, 0, 0, 255)?)?;
+        self.set_led(hours, self.hour)?;
+        self.set_led(hours + 1, self.hour)?;
+        self.set_led(minutes, self.minute)?;
+        self.set_led(seconds, self.second)?;
         Ok(self)
     }
 }

@@ -3,7 +3,7 @@ use crate::led::LedMessage;
 use crate::pollen::PollenCount;
 use crate::Result;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct LedValue {
     brightness: u8,
     blue: u8,
@@ -43,31 +43,50 @@ impl Default for LedValue {
     }
 }
 
-const RED: LedValue = LedValue {
+pub const LED_LOW_RED: LedValue = LedValue {
     brightness: 1,
     red: 255,
     green: 0,
     blue: 0,
 };
-const YELLOW: LedValue = LedValue {
+pub const LED_LOW_YELLOW: LedValue = LedValue {
     brightness: 1,
     red: 255,
     green: 150,
     blue: 0,
 };
-const GREEN: LedValue = LedValue {
+pub const LED_LOW_GREEN: LedValue = LedValue {
     brightness: 1,
     red: 0,
     green: 255,
     blue: 0,
 };
 
+pub const LED_LOW_BLUE: LedValue = LedValue {
+    brightness: 1,
+    red: 0,
+    green: 0,
+    blue: 255,
+};
+pub const LED_LOW_PURPLE: LedValue = LedValue {
+    brightness: 1,
+    red: 255,
+    green: 0,
+    blue: 255,
+};
+pub const LED_LOW_AQUA: LedValue = LedValue {
+    brightness: 1,
+    red: 0,
+    green: 255,
+    blue: 255,
+};
+
 impl From<Option<PollenCount>> for LedValue {
     fn from(count: Option<PollenCount>) -> Self {
         match count {
-            Some(PollenCount::High) => RED.clone(),      // Red
-            Some(PollenCount::Medium) => YELLOW.clone(), // Yellow
-            Some(PollenCount::Low) => GREEN.clone(),     // Green
+            Some(PollenCount::High) => LED_LOW_RED,
+            Some(PollenCount::Medium) => LED_LOW_YELLOW,
+            Some(PollenCount::Low) => LED_LOW_GREEN,
             None => LedValue::default(),
         }
     }
