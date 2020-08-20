@@ -12,6 +12,11 @@ Features
 - Error reporting using IFTTT (keyed by an environment variable)
 - Signal handling to turn off all the lights if the program is asked by the OS to stop
 
+Missing features:
+-----------------
+
+- Tests 😭
+
 Physical Parts:
 ---------------
 
